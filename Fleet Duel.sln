@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36705.20 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fleet Duel", "Fleet Duel\Fleet Duel.csproj", "{CC27637F-A497-46F3-9DF4-90FEDF427B87}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CC27637F-A497-46F3-9DF4-90FEDF427B87}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC27637F-A497-46F3-9DF4-90FEDF427B87}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC27637F-A497-46F3-9DF4-90FEDF427B87}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC27637F-A497-46F3-9DF4-90FEDF427B87}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FE534123-1205-471E-858F-98288C0DEB1B}
+	EndGlobalSection
+EndGlobal
