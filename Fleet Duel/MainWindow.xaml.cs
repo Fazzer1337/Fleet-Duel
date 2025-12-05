@@ -10,6 +10,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using System.Media;
 using Fleet_Duel.GameLogic;
 using Fleet_Duel.Views;
 using System.Linq;
@@ -31,6 +32,9 @@ namespace Fleet_Duel
         private bool isPlacingShip = false;
         private GameSettings settings;
         private bool isAutoPlaced;
+        private SoundPlayer soundMiss;
+        private SoundPlayer soundHit;
+        private SoundPlayer soundDestroyed;
 
         public GameSettings CurrentSettings => settings;
 
@@ -39,8 +43,16 @@ namespace Fleet_Duel
             InitializeComponent();
             this.Title = "Fleet Duel - Морской бой";
             settings = new GameSettings();
+            InitSounds();
             InitializeGame();
             ApplyTheme();
+        }
+
+        private void InitSounds()
+        {
+            soundMiss = new SoundPlayer("sounds/shot_miss.wav");
+            soundHit = new SoundPlayer("sounds/shot_hit.wav");
+            soundDestroyed = new SoundPlayer("sounds/ship_destroyed.wav");
         }
 
         private void InitializeGame()
@@ -409,6 +421,14 @@ namespace Fleet_Duel
                 return;
 
             var result = enemyBoard.MakeShot(x, y);
+
+            if (result == CellState.Miss)
+                soundMiss.Play();
+            else if (result == CellState.Hit)
+                soundHit.Play();
+            else if (result == CellState.Destroyed)
+                soundDestroyed.Play();
+
             UpdateBoardDisplay();
 
             if (result == CellState.Miss)
@@ -444,6 +464,13 @@ namespace Fleet_Duel
 
             var result = playerBoard.MakeShot(x, y);
             aiPlayer.UpdateAfterShot(shot, result);
+
+            if (result == CellState.Miss)
+                soundMiss.Play();
+            else if (result == CellState.Hit)
+                soundHit.Play();
+            else if (result == CellState.Destroyed)
+                soundDestroyed.Play();
 
             UpdateBoardDisplay();
 

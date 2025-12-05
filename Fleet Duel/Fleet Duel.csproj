@@ -9,4 +9,22 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Remove="sounds\ship_destroyed.wav" />
+    <None Remove="sounds\shot_hit.wav" />
+    <None Remove="sounds\shot_miss.wav" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="sounds\ship_destroyed.wav">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="sounds\shot_hit.wav">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="sounds\shot_miss.wav">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
