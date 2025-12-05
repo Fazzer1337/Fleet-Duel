@@ -13,7 +13,6 @@ using System.Windows.Threading;
 using Fleet_Duel.GameLogic;
 using Fleet_Duel.Views;
 using System.Linq;
-
 using Fleet_Duel.Windows;
 
 namespace Fleet_Duel
@@ -31,6 +30,7 @@ namespace Fleet_Duel
         private DispatcherTimer aiTimer;
         private bool isPlacingShip = false;
         private GameSettings settings;
+        private bool isAutoPlaced;
 
         public GameSettings CurrentSettings => settings;
 
@@ -38,8 +38,6 @@ namespace Fleet_Duel
         {
             InitializeComponent();
             this.Title = "Fleet Duel - Морской бой";
-
-            // Загружаем настройки по умолчанию
             settings = new GameSettings();
             InitializeGame();
             ApplyTheme();
@@ -49,14 +47,12 @@ namespace Fleet_Duel
         {
             playerBoard = new GameBoard();
             enemyBoard = new GameBoard();
+            isAutoPlaced = false;
 
-            // Автоматическая расстановка кораблей противника
             while (!ShipPlacement.AutoPlaceShips(enemyBoard))
             {
-                // Повторяем пока не получится правильно расставить
             }
 
-            // Создаем AI в зависимости от уровня сложности
             aiPlayer = CreateAIPlayer(settings.Difficulty);
 
             currentState = GameState.PlacingShips;
@@ -96,7 +92,6 @@ namespace Fleet_Duel
             {
                 for (int x = 0; x < GameBoard.BoardSize; x++)
                 {
-                    // Клетки игрока
                     var playerCell = new CellControl
                     {
                         Position = new Point(x, y),
@@ -112,7 +107,6 @@ namespace Fleet_Duel
                     playerBoardPanel.Children.Add(playerCell);
                     playerCells[x, y] = playerCell;
 
-                    // Клетки противника
                     var enemyCell = new CellControl
                     {
                         Position = new Point(x, y),
@@ -138,6 +132,7 @@ namespace Fleet_Duel
                 shipInfoText.Text = $"Разместите {currentShip.Size}-палубный корабль " +
                                    $"({(currentShip.IsHorizontal ? "горизонтальный" : "вертикальный")})";
                 isPlacingShip = true;
+                isAutoPlaced = false;
             }
             else
             {
@@ -191,7 +186,6 @@ namespace Fleet_Duel
             }
             else if (settings.ShowShipPlacementHints)
             {
-                // Показываем подсказки о нарушениях
                 var violations = playerBoard.GetPlacementViolations(currentShip, cell.Position);
                 string message = "Невозможно разместить корабль здесь!\n";
 
@@ -229,13 +223,11 @@ namespace Fleet_Duel
                 {
                     if (canPlace)
                     {
-                        // Зеленый для допустимого размещения
                         playerCells[x, y].PreviewState = CellState.Ship;
                         playerCells[x, y].PreviewColor = Colors.LightGreen;
                     }
                     else if (settings.ShowShipPlacementHints)
                     {
-                        // Красный для недопустимого размещения
                         playerCells[x, y].PreviewState = CellState.Hit;
                         playerCells[x, y].PreviewColor = Colors.LightCoral;
                     }
@@ -256,7 +248,6 @@ namespace Fleet_Duel
                 {
                     playerCells[x, y].CellState = playerBoard[x, y];
 
-                    // Для поля противника скрываем неподбитые корабли
                     if (currentState == GameState.PlacingShips ||
                         currentState == GameState.PlayerTurn ||
                         currentState == GameState.AITurn)
@@ -272,7 +263,6 @@ namespace Fleet_Duel
                     }
                     else
                     {
-                        // В конце игры показываем все корабли
                         enemyCells[x, y].CellState = enemyBoard[x, y];
                     }
                 }
@@ -319,8 +309,7 @@ namespace Fleet_Duel
                 return;
             }
 
-            // Проверяем, не касаются ли корабли
-            if (playerBoard.HasAdjacentShips())
+            if (!isAutoPlaced && playerBoard.HasAdjacentShips())
             {
                 MessageBox.Show("Корабли не должны касаться друг друга! Проверьте расстановку.",
                               "Ошибка расстановки", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -331,7 +320,6 @@ namespace Fleet_Duel
             UpdateButtonStates();
             UpdateStatus();
 
-            // Добавляем обработчики для кликов по полю противника
             foreach (var cell in enemyCells)
             {
                 cell.MouseDown += EnemyCell_MouseDown;
@@ -346,6 +334,7 @@ namespace Fleet_Duel
                 currentShipIndex = 10;
                 FinishShipPlacement();
                 UpdateBoardDisplay();
+                isAutoPlaced = true;
                 MessageBox.Show("Корабли расставлены автоматически!");
             }
             else
@@ -381,18 +370,15 @@ namespace Fleet_Duel
                 }
             }
 
-            // Останавливаем таймер
             if (aiTimer.IsEnabled)
                 aiTimer.Stop();
 
-            // Удаляем обработчики событий
             foreach (var cell in enemyCells)
             {
                 if (cell != null)
                     cell.MouseDown -= EnemyCell_MouseDown;
             }
 
-            // Инициализируем новую игру
             InitializeGame();
         }
 
@@ -417,7 +403,6 @@ namespace Fleet_Duel
             int x = (int)cell.Position.X;
             int y = (int)cell.Position.Y;
 
-            // Проверяем, не стреляли ли уже в эту клетку
             if (enemyBoard[x, y] == CellState.Hit ||
                 enemyBoard[x, y] == CellState.Miss ||
                 enemyBoard[x, y] == CellState.Destroyed)
@@ -447,12 +432,17 @@ namespace Fleet_Duel
             aiTimer.Stop();
 
             var shot = aiPlayer.MakeMove();
+            if (shot.X < 0 || shot.Y < 0)
+            {
+                currentState = GameState.PlayerTurn;
+                UpdateStatus();
+                return;
+            }
+
             int x = (int)shot.X;
             int y = (int)shot.Y;
 
             var result = playerBoard.MakeShot(x, y);
-
-            // Обновляем AI о результате выстрела
             aiPlayer.UpdateAfterShot(shot, result);
 
             UpdateBoardDisplay();
@@ -473,7 +463,6 @@ namespace Fleet_Duel
             }
             else
             {
-                // Если AI попал, он стреляет снова
                 aiTimer.Start();
             }
         }
@@ -483,7 +472,6 @@ namespace Fleet_Duel
             UpdateBoardDisplay();
             UpdateButtonStates();
 
-            // Удаляем обработчики кликов
             foreach (var cell in enemyCells)
             {
                 cell.MouseDown -= EnemyCell_MouseDown;
@@ -495,7 +483,6 @@ namespace Fleet_Duel
             this.settings = newSettings;
             ApplyTheme();
 
-            // Обновляем AI если игра уже началась
             if (currentState == GameState.PlayerTurn || currentState == GameState.AITurn)
             {
                 aiPlayer = CreateAIPlayer(settings.Difficulty);
@@ -506,20 +493,17 @@ namespace Fleet_Duel
         {
             if (settings.DarkTheme)
             {
-                // Темная тема
                 this.Background = new SolidColorBrush(Color.FromRgb(30, 30, 30));
                 statusText.Foreground = Brushes.White;
                 shipInfoText.Foreground = Brushes.White;
             }
             else
             {
-                // Светлая тема
                 this.Background = Brushes.White;
                 statusText.Foreground = Brushes.Black;
                 shipInfoText.Foreground = Brushes.Black;
             }
 
-            // Обновляем клетки
             foreach (var cell in playerCells)
             {
                 if (cell != null)
