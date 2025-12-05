@@ -11,6 +11,8 @@ namespace Fleet_Duel.GameLogic
         PlacingShips,
         PlayerTurn,
         AITurn,
+        Player1Turn,
+        Player2Turn,
         PlayerWon,
         AIWon,
         GameOver
