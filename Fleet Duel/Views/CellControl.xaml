@@ -1,35 +1,15 @@
 <UserControl x:Class="Fleet_Duel.Views.CellControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             mc:Ignorable="d" 
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
              d:DesignHeight="30" d:DesignWidth="30"
-             x:Name="root">
+             x:Name="root"
+             Cursor="Hand">
 
-    <Border BorderBrush="LightGray" BorderThickness="1">
-        <Border.Resources>
-            <Style TargetType="Border">
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding CellState, ElementName=root}" Value="Empty">
-                        <Setter Property="Background" Value="AliceBlue"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding CellState, ElementName=root}" Value="Ship">
-                        <Setter Property="Background" Value="Gray"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding CellState, ElementName=root}" Value="Hit">
-                        <Setter Property="Background" Value="OrangeRed"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding CellState, ElementName=root}" Value="Miss">
-                        <Setter Property="Background" Value="LightBlue"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding CellState, ElementName=root}" Value="Destroyed">
-                        <Setter Property="Background" Value="DarkRed"/>
-                    </DataTrigger>
-                </Style.Triggers>
-            </Style>
-        </Border.Resources>
-
-        <TextBlock x:Name="cellText" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-    </Border>
+	<Border x:Name="cellBorder" BorderBrush="LightGray" BorderThickness="1" Background="AliceBlue">
+		<TextBlock x:Name="cellText" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   FontSize="12" FontWeight="Bold"/>
+	</Border>
 </UserControl>

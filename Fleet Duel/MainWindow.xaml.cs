@@ -12,15 +12,17 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using Fleet_Duel.GameLogic;
 using Fleet_Duel.Views;
+using System.Linq;
+
+using Fleet_Duel.Windows;
 
 namespace Fleet_Duel
-
 {
     public partial class MainWindow : Window
     {
         private GameBoard playerBoard;
         private GameBoard enemyBoard;
-        private AIPlayer aiPlayer;
+        private IAIPlayer aiPlayer;
         private GameState currentState;
         private Ship currentShip;
         private int currentShipIndex;
@@ -28,12 +30,19 @@ namespace Fleet_Duel
         private CellControl[,] enemyCells;
         private DispatcherTimer aiTimer;
         private bool isPlacingShip = false;
+        private GameSettings settings;
+
+        public GameSettings CurrentSettings => settings;
 
         public MainWindow()
         {
             InitializeComponent();
             this.Title = "Fleet Duel - Морской бой";
+
+            // Загружаем настройки по умолчанию
+            settings = new GameSettings();
             InitializeGame();
+            ApplyTheme();
         }
 
         private void InitializeGame()
@@ -41,9 +50,15 @@ namespace Fleet_Duel
             playerBoard = new GameBoard();
             enemyBoard = new GameBoard();
 
-            ShipPlacement.AutoPlaceShips(enemyBoard);
+            // Автоматическая расстановка кораблей противника
+            while (!ShipPlacement.AutoPlaceShips(enemyBoard))
+            {
+                // Повторяем пока не получится правильно расставить
+            }
 
-            aiPlayer = new AIPlayer(playerBoard);
+            // Создаем AI в зависимости от уровня сложности
+            aiPlayer = CreateAIPlayer(settings.Difficulty);
+
             currentState = GameState.PlacingShips;
             currentShipIndex = 0;
 
@@ -52,18 +67,27 @@ namespace Fleet_Duel
             UpdateStatus();
 
             aiTimer = new DispatcherTimer();
-            aiTimer.Interval = TimeSpan.FromSeconds(0.7);
+            aiTimer.Interval = TimeSpan.FromSeconds(settings.Difficulty == DifficultyLevel.Hard ? 1.0 : 0.7);
             aiTimer.Tick += AITimer_Tick;
 
-            startButton.IsEnabled = false;
-            rotateButton.IsEnabled = true;
-            surrenderButton.IsEnabled = false;
+            UpdateButtonStates();
+        }
+
+        private IAIPlayer CreateAIPlayer(DifficultyLevel difficulty)
+        {
+            return difficulty switch
+            {
+                DifficultyLevel.Easy => new EasyAIPlayer(playerBoard),
+                DifficultyLevel.Medium => new MediumAIPlayer(playerBoard),
+                DifficultyLevel.Hard => new HardAIPlayer(playerBoard),
+                _ => new MediumAIPlayer(playerBoard)
+            };
         }
 
         private void InitializeBoards()
         {
-            playerBoardPanel.Children.Clear();  // Используем новое имя
-            enemyBoardPanel.Children.Clear();    // Используем новое имя
+            playerBoardPanel.Children.Clear();
+            enemyBoardPanel.Children.Clear();
 
             playerCells = new CellControl[GameBoard.BoardSize, GameBoard.BoardSize];
             enemyCells = new CellControl[GameBoard.BoardSize, GameBoard.BoardSize];
@@ -72,28 +96,33 @@ namespace Fleet_Duel
             {
                 for (int x = 0; x < GameBoard.BoardSize; x++)
                 {
+                    // Клетки игрока
                     var playerCell = new CellControl
                     {
                         Position = new Point(x, y),
                         Width = 30,
-                        Height = 30
+                        Height = 30,
+                        IsDarkTheme = settings.DarkTheme
                     };
 
                     playerCell.MouseEnter += PlayerCell_MouseEnter;
                     playerCell.MouseLeave += PlayerCell_MouseLeave;
                     playerCell.MouseDown += PlayerCell_MouseDown;
 
-                    playerBoardPanel.Children.Add(playerCell);  // Используем новое имя
+                    playerBoardPanel.Children.Add(playerCell);
                     playerCells[x, y] = playerCell;
 
+                    // Клетки противника
                     var enemyCell = new CellControl
                     {
                         Position = new Point(x, y),
                         Width = 30,
-                        Height = 30
+                        Height = 30,
+                        IsDarkTheme = settings.DarkTheme
                     };
 
-                    enemyBoardPanel.Children.Add(enemyCell);    // Используем новое имя
+                    enemyCell.MouseDown += EnemyCell_MouseDown;
+                    enemyBoardPanel.Children.Add(enemyCell);
                     enemyCells[x, y] = enemyCell;
                 }
             }
@@ -106,7 +135,8 @@ namespace Fleet_Duel
             if (currentShipIndex < fleet.Count)
             {
                 currentShip = fleet[currentShipIndex];
-                shipInfoText.Text = $"Разместите {currentShip.Size}-палубный корабль";
+                shipInfoText.Text = $"Разместите {currentShip.Size}-палубный корабль " +
+                                   $"({(currentShip.IsHorizontal ? "горизонтальный" : "вертикальный")})";
                 isPlacingShip = true;
             }
             else
@@ -118,9 +148,9 @@ namespace Fleet_Duel
         private void FinishShipPlacement()
         {
             isPlacingShip = false;
-            shipInfoText.Text = "Все корабли размещены";
+            shipInfoText.Text = $"Все корабли размещены ({playerBoard.Ships.Count}/10)";
             startButton.IsEnabled = true;
-            rotateButton.IsEnabled = false;
+            UpdateButtonStates();
             ClearPreview();
         }
 
@@ -159,14 +189,33 @@ namespace Fleet_Duel
                     SetupShipPlacement();
                 }
             }
+            else if (settings.ShowShipPlacementHints)
+            {
+                // Показываем подсказки о нарушениях
+                var violations = playerBoard.GetPlacementViolations(currentShip, cell.Position);
+                string message = "Невозможно разместить корабль здесь!\n";
+
+                if (violations.Any(p => p.X < 0 || p.X >= GameBoard.BoardSize ||
+                                       p.Y < 0 || p.Y >= GameBoard.BoardSize))
+                {
+                    message += "• Корабль выходит за границы поля\n";
+                }
+
+                if (violations.Count > 0)
+                {
+                    message += "• Корабли не должны касаться друг друга";
+                }
+
+                MessageBox.Show(message, "Ошибка размещения", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void ShowShipPreview(Point position)
         {
             ClearPreview();
 
-            if (!playerBoard.CanPlaceShip(currentShip, position))
-                return;
+            var violations = playerBoard.GetPlacementViolations(currentShip, position);
+            bool canPlace = violations.Count == 0;
 
             int dx = currentShip.IsHorizontal ? 1 : 0;
             int dy = currentShip.IsHorizontal ? 0 : 1;
@@ -178,7 +227,18 @@ namespace Fleet_Duel
 
                 if (x >= 0 && x < GameBoard.BoardSize && y >= 0 && y < GameBoard.BoardSize)
                 {
-                    playerCells[x, y].CellState = CellState.Ship;
+                    if (canPlace)
+                    {
+                        // Зеленый для допустимого размещения
+                        playerCells[x, y].PreviewState = CellState.Ship;
+                        playerCells[x, y].PreviewColor = Colors.LightGreen;
+                    }
+                    else if (settings.ShowShipPlacementHints)
+                    {
+                        // Красный для недопустимого размещения
+                        playerCells[x, y].PreviewState = CellState.Hit;
+                        playerCells[x, y].PreviewColor = Colors.LightCoral;
+                    }
                 }
             }
         }
@@ -195,13 +255,25 @@ namespace Fleet_Duel
                 for (int y = 0; y < GameBoard.BoardSize; y++)
                 {
                     playerCells[x, y].CellState = playerBoard[x, y];
-                    enemyCells[x, y].CellState = enemyBoard[x, y];
 
-                    if (enemyBoard[x, y] == CellState.Ship &&
-                        currentState != GameState.PlayerWon &&
-                        currentState != GameState.AIWon)
+                    // Для поля противника скрываем неподбитые корабли
+                    if (currentState == GameState.PlacingShips ||
+                        currentState == GameState.PlayerTurn ||
+                        currentState == GameState.AITurn)
                     {
-                        enemyCells[x, y].CellState = CellState.Empty;
+                        if (enemyBoard[x, y] == CellState.Ship)
+                        {
+                            enemyCells[x, y].CellState = CellState.Empty;
+                        }
+                        else
+                        {
+                            enemyCells[x, y].CellState = enemyBoard[x, y];
+                        }
+                    }
+                    else
+                    {
+                        // В конце игры показываем все корабли
+                        enemyCells[x, y].CellState = enemyBoard[x, y];
                     }
                 }
             }
@@ -212,13 +284,13 @@ namespace Fleet_Duel
             switch (currentState)
             {
                 case GameState.PlacingShips:
-                    statusText.Text = "Расставьте корабли";
+                    statusText.Text = $"Расставьте корабли ({playerBoard.Ships.Count}/10)";
                     break;
                 case GameState.PlayerTurn:
                     statusText.Text = "Ваш ход";
                     break;
                 case GameState.AITurn:
-                    statusText.Text = "Ход противника";
+                    statusText.Text = $"Ход противника ({settings.Difficulty})";
                     break;
                 case GameState.PlayerWon:
                     statusText.Text = "Вы победили!";
@@ -229,26 +301,41 @@ namespace Fleet_Duel
             }
         }
 
+        private void UpdateButtonStates()
+        {
+            startButton.IsEnabled = playerBoard.Ships.Count == 10 && currentState == GameState.PlacingShips;
+            autoPlaceButton.IsEnabled = currentState == GameState.PlacingShips;
+            rotateButton.IsEnabled = currentState == GameState.PlacingShips && isPlacingShip;
+            surrenderButton.IsEnabled = currentState == GameState.PlayerTurn || currentState == GameState.AITurn;
+            settingsButton.IsEnabled = currentState == GameState.PlacingShips;
+            newGameButton.IsEnabled = true;
+        }
+
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
             if (playerBoard.Ships.Count != 10)
             {
-                MessageBox.Show("Разместите все корабли перед началом игры!");
+                MessageBox.Show("Разместите все 10 кораблей перед началом игры!");
+                return;
+            }
+
+            // Проверяем, не касаются ли корабли
+            if (playerBoard.HasAdjacentShips())
+            {
+                MessageBox.Show("Корабли не должны касаться друг друга! Проверьте расстановку.",
+                              "Ошибка расстановки", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             currentState = GameState.PlayerTurn;
-            startButton.IsEnabled = false;
-            autoPlaceButton.IsEnabled = false;
-            rotateButton.IsEnabled = false;
-            surrenderButton.IsEnabled = true;
+            UpdateButtonStates();
+            UpdateStatus();
 
+            // Добавляем обработчики для кликов по полю противника
             foreach (var cell in enemyCells)
             {
                 cell.MouseDown += EnemyCell_MouseDown;
             }
-
-            UpdateStatus();
         }
 
         private void AutoPlaceButton_Click(object sender, RoutedEventArgs e)
@@ -260,6 +347,10 @@ namespace Fleet_Duel
                 FinishShipPlacement();
                 UpdateBoardDisplay();
                 MessageBox.Show("Корабли расставлены автоматически!");
+            }
+            else
+            {
+                MessageBox.Show("Не удалось автоматически расставить корабли. Попробуйте еще раз.");
             }
         }
 
@@ -273,12 +364,49 @@ namespace Fleet_Duel
             }
         }
 
+        private void SettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            var settingsWindow = new Fleet_Duel.Windows.SettingsWindow(this);
+            settingsWindow.ShowDialog();
+        }
+
+        private void NewGameButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (currentState == GameState.PlayerTurn || currentState == GameState.AITurn)
+            {
+                if (MessageBox.Show("Текущая игра будет потеряна. Начать новую игру?",
+                    "Новая игра", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                {
+                    return;
+                }
+            }
+
+            // Останавливаем таймер
+            if (aiTimer.IsEnabled)
+                aiTimer.Stop();
+
+            // Удаляем обработчики событий
+            foreach (var cell in enemyCells)
+            {
+                if (cell != null)
+                    cell.MouseDown -= EnemyCell_MouseDown;
+            }
+
+            // Инициализируем новую игру
+            InitializeGame();
+        }
+
         private void SurrenderButton_Click(object sender, RoutedEventArgs e)
         {
-            currentState = GameState.AIWon;
-            UpdateStatus();
-            MessageBox.Show("Вы сдались. Игра окончена.");
-            EndGame();
+            if (MessageBox.Show("Вы уверены, что хотите сдаться?", "Сдача",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            {
+                currentState = GameState.AIWon;
+                UpdateStatus();
+                UpdateBoardDisplay();
+                MessageBox.Show("Вы сдались. Игра окончена.");
+                EndGame();
+            }
         }
 
         private void EnemyCell_MouseDown(object sender, MouseButtonEventArgs e)
@@ -289,6 +417,7 @@ namespace Fleet_Duel
             int x = (int)cell.Position.X;
             int y = (int)cell.Position.Y;
 
+            // Проверяем, не стреляли ли уже в эту клетку
             if (enemyBoard[x, y] == CellState.Hit ||
                 enemyBoard[x, y] == CellState.Miss ||
                 enemyBoard[x, y] == CellState.Destroyed)
@@ -307,6 +436,7 @@ namespace Fleet_Duel
             {
                 currentState = GameState.PlayerWon;
                 UpdateStatus();
+                UpdateBoardDisplay();
                 MessageBox.Show("Поздравляем! Вы победили!");
                 EndGame();
             }
@@ -321,6 +451,10 @@ namespace Fleet_Duel
             int y = (int)shot.Y;
 
             var result = playerBoard.MakeShot(x, y);
+
+            // Обновляем AI о результате выстрела
+            aiPlayer.UpdateAfterShot(shot, result);
+
             UpdateBoardDisplay();
 
             if (result == CellState.Miss || playerBoard.AllShipsDestroyed())
@@ -332,12 +466,14 @@ namespace Fleet_Duel
                 {
                     currentState = GameState.AIWon;
                     UpdateStatus();
+                    UpdateBoardDisplay();
                     MessageBox.Show("Противник победил!");
                     EndGame();
                 }
             }
             else
             {
+                // Если AI попал, он стреляет снова
                 aiTimer.Start();
             }
         }
@@ -345,16 +481,56 @@ namespace Fleet_Duel
         private void EndGame()
         {
             UpdateBoardDisplay();
+            UpdateButtonStates();
 
+            // Удаляем обработчики кликов
             foreach (var cell in enemyCells)
             {
                 cell.MouseDown -= EnemyCell_MouseDown;
             }
+        }
 
-            startButton.IsEnabled = false;
-            autoPlaceButton.IsEnabled = false;
-            rotateButton.IsEnabled = false;
-            surrenderButton.IsEnabled = false;
+        public void ApplySettings(GameSettings newSettings)
+        {
+            this.settings = newSettings;
+            ApplyTheme();
+
+            // Обновляем AI если игра уже началась
+            if (currentState == GameState.PlayerTurn || currentState == GameState.AITurn)
+            {
+                aiPlayer = CreateAIPlayer(settings.Difficulty);
+            }
+        }
+
+        private void ApplyTheme()
+        {
+            if (settings.DarkTheme)
+            {
+                // Темная тема
+                this.Background = new SolidColorBrush(Color.FromRgb(30, 30, 30));
+                statusText.Foreground = Brushes.White;
+                shipInfoText.Foreground = Brushes.White;
+            }
+            else
+            {
+                // Светлая тема
+                this.Background = Brushes.White;
+                statusText.Foreground = Brushes.Black;
+                shipInfoText.Foreground = Brushes.Black;
+            }
+
+            // Обновляем клетки
+            foreach (var cell in playerCells)
+            {
+                if (cell != null)
+                    cell.IsDarkTheme = settings.DarkTheme;
+            }
+
+            foreach (var cell in enemyCells)
+            {
+                if (cell != null)
+                    cell.IsDarkTheme = settings.DarkTheme;
+            }
         }
     }
 }

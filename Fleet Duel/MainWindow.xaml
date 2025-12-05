@@ -65,8 +65,10 @@
                 <Button x:Name="startButton" Content="Начать игру" Click="StartButton_Click"/>
                 <Button x:Name="autoPlaceButton" Content="Расставить автоматически" Click="AutoPlaceButton_Click"/>
                 <Button x:Name="rotateButton" Content="Повернуть корабль" Click="RotateButton_Click"/>
+                <Button x:Name="settingsButton" Content="Настройки" Click="SettingsButton_Click"/>
+                <Button x:Name="newGameButton" Content="Новая игра" Click="NewGameButton_Click"/>
                 <Button x:Name="surrenderButton" Content="Сдаться" Click="SurrenderButton_Click"/>
             </StackPanel>
         </Border>
     </Grid>
-</Window>   
+</Window>

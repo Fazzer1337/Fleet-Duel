@@ -36,6 +36,12 @@ namespace Fleet_Duel.GameLogic
 
         public bool CanPlaceShip(Ship ship, Point startPos)
         {
+            return GetPlacementViolations(ship, startPos).Count == 0;
+        }
+
+        public List<Point> GetPlacementViolations(Ship ship, Point startPos)
+        {
+            List<Point> violations = new List<Point>();
             int dx = ship.IsHorizontal ? 1 : 0;
             int dy = ship.IsHorizontal ? 0 : 1;
 
@@ -45,14 +51,17 @@ namespace Fleet_Duel.GameLogic
                 int y = (int)startPos.Y + i * dy;
 
                 if (x < 0 || x >= BoardSize || y < 0 || y >= BoardSize)
-                    return false;
+                {
+                    violations.Add(new Point(x, y));
+                    continue;
+                }
 
                 for (int nx = Math.Max(0, x - 1); nx <= Math.Min(BoardSize - 1, x + 1); nx++)
                     for (int ny = Math.Max(0, y - 1); ny <= Math.Min(BoardSize - 1, y + 1); ny++)
                         if (cells[nx, ny] == CellState.Ship)
-                            return false;
+                            violations.Add(new Point(x, y));
             }
-            return true;
+            return violations;
         }
 
         public bool PlaceShip(Ship ship, Point startPos)
@@ -90,8 +99,7 @@ namespace Fleet_Duel.GameLogic
 
                 if (ship?.IsDestroyed ?? false)
                 {
-                    foreach (var cell in ship.Cells)
-                        cells[(int)cell.X, (int)cell.Y] = CellState.Destroyed;
+                    MarkDestroyedShip(ship);
                     return CellState.Destroyed;
                 }
                 return CellState.Hit;
@@ -105,9 +113,85 @@ namespace Fleet_Duel.GameLogic
             return cells[x, y];
         }
 
+        private void MarkDestroyedShip(Ship ship)
+        {
+            // Отмечаем клетки корабля как уничтоженные
+            foreach (var cell in ship.Cells)
+            {
+                int x = (int)cell.X;
+                int y = (int)cell.Y;
+                cells[x, y] = CellState.Destroyed;
+            }
+
+            // Отмечаем клетки вокруг корабля как промахи
+            foreach (var cell in ship.Cells)
+            {
+                int x = (int)cell.X;
+                int y = (int)cell.Y;
+
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    for (int dy = -1; dy <= 1; dy++)
+                    {
+                        int nx = x + dx;
+                        int ny = y + dy;
+
+                        if (nx >= 0 && nx < BoardSize && ny >= 0 && ny < BoardSize)
+                        {
+                            if (cells[nx, ny] == CellState.Empty)
+                            {
+                                cells[nx, ny] = CellState.Miss;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         public bool AllShipsDestroyed()
         {
             return Ships.All(ship => ship.IsDestroyed);
+        }
+
+        public CellState GetCellState(int x, int y)
+        {
+            if (x >= 0 && x < BoardSize && y >= 0 && y < BoardSize)
+                return cells[x, y];
+            return CellState.Empty;
+        }
+
+        // Метод для проверки, не касаются ли корабли
+        public bool HasAdjacentShips()
+        {
+            for (int x = 0; x < BoardSize; x++)
+            {
+                for (int y = 0; y < BoardSize; y++)
+                {
+                    if (cells[x, y] == CellState.Ship)
+                    {
+                        // Проверяем все 8 соседних клеток
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            for (int dy = -1; dy <= 1; dy++)
+                            {
+                                if (dx == 0 && dy == 0) continue;
+
+                                int nx = x + dx;
+                                int ny = y + dy;
+
+                                if (nx >= 0 && nx < BoardSize && ny >= 0 && ny < BoardSize)
+                                {
+                                    if (cells[nx, ny] == CellState.Ship)
+                                    {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
         }
     }
 }
