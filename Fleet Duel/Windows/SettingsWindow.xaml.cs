@@ -20,7 +20,6 @@ namespace Fleet_Duel.Windows
 
         private void LoadSettings()
         {
-            // Загружаем уровень сложности
             foreach (ComboBoxItem item in difficultyComboBox.Items)
             {
                 if (item.Tag?.ToString() == settings.Difficulty.ToString())
@@ -30,18 +29,24 @@ namespace Fleet_Duel.Windows
                 }
             }
 
-            // Загружаем тему
+            foreach (ComboBoxItem item in modeComboBox.Items)
+            {
+                if (item.Tag?.ToString() == settings.Mode.ToString())
+                {
+                    modeComboBox.SelectedItem = item;
+                    break;
+                }
+            }
+
             themeComboBox.SelectedIndex = settings.DarkTheme ? 1 : 0;
 
-            // Загружаем чекбоксы
             hintsCheckBox.IsChecked = settings.ShowShipPlacementHints;
             autoCompleteCheckBox.IsChecked = settings.AutoCompleteDestroyedShips;
-            showShipsCheckBox.IsChecked = true; // По умолчанию
+            showShipsCheckBox.IsChecked = true;
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            // Сохраняем уровень сложности
             if (difficultyComboBox.SelectedItem is ComboBoxItem selectedItem)
             {
                 string difficulty = selectedItem.Tag?.ToString() ?? "Medium";
@@ -54,14 +59,21 @@ namespace Fleet_Duel.Windows
                 };
             }
 
-            // Сохраняем тему
-            settings.DarkTheme = themeComboBox.SelectedIndex == 1;
+            if (modeComboBox.SelectedItem is ComboBoxItem modeItem)
+            {
+                string mode = modeItem.Tag?.ToString() ?? "VsAI";
+                settings.Mode = mode switch
+                {
+                    "VsAI" => GameMode.VsAI,
+                    "Hotseat" => GameMode.Hotseat,
+                    _ => GameMode.VsAI
+                };
+            }
 
-            // Сохраняем чекбоксы
+            settings.DarkTheme = themeComboBox.SelectedIndex == 1;
             settings.ShowShipPlacementHints = hintsCheckBox.IsChecked ?? true;
             settings.AutoCompleteDestroyedShips = autoCompleteCheckBox.IsChecked ?? true;
 
-            // Применяем настройки к главному окну
             mainWindow.ApplySettings(settings);
 
             DialogResult = true;
@@ -76,7 +88,6 @@ namespace Fleet_Duel.Windows
 
         private void DefaultButton_Click(object sender, RoutedEventArgs e)
         {
-            // Сбрасываем настройки по умолчанию
             settings = new GameSettings();
             LoadSettings();
         }

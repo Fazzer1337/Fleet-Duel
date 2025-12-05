@@ -98,43 +98,37 @@ namespace Fleet_Duel.Views
             {
                 cellBorder.Background = new SolidColorBrush(PreviewColor);
                 cellText.Text = "";
-                return;
             }
-
-            switch (stateToShow)
+            else
             {
-                case CellState.Empty:
-                    cellBorder.Background = new SolidColorBrush(
-                        IsDarkTheme ? GameSettings.DarkCellColor : GameSettings.LightCellColor);
-                    cellText.Text = "";
-                    break;
-                case CellState.Ship:
-                    cellBorder.Background = new SolidColorBrush(
-                        IsDarkTheme ? GameSettings.DarkShipColor : GameSettings.LightShipColor);
-                    cellText.Text = "";
-                    break;
-                case CellState.Hit:
-                    cellBorder.Background = new SolidColorBrush(GameSettings.HitColor);
-                    cellText.Text = "✕";
-                    cellText.Foreground = Brushes.White;
-                    break;
-                case CellState.Miss:
-                    cellBorder.Background = new SolidColorBrush(GameSettings.MissColor);
-                    cellText.Text = "•";
-                    cellText.Foreground = Brushes.Black;
-                    break;
-                case CellState.Destroyed:
-                    cellBorder.Background = new SolidColorBrush(GameSettings.DestroyedColor);
-                    cellText.Text = "✕";
-                    cellText.Foreground = Brushes.White;
-                    break;
-            }
-
-            // Сбрасываем PreviewState после отображения
-            if (PreviewState != CellState.Empty)
-            {
-                PreviewState = CellState.Empty;
-                PreviewColor = Colors.Transparent;
+                switch (stateToShow)
+                {
+                    case CellState.Empty:
+                        cellBorder.Background = new SolidColorBrush(
+                            IsDarkTheme ? GameSettings.DarkCellColor : GameSettings.LightCellColor);
+                        cellText.Text = "";
+                        break;
+                    case CellState.Ship:
+                        cellBorder.Background = new SolidColorBrush(
+                            IsDarkTheme ? GameSettings.DarkShipColor : GameSettings.LightShipColor);
+                        cellText.Text = "";
+                        break;
+                    case CellState.Hit:
+                        cellBorder.Background = new SolidColorBrush(GameSettings.HitColor);
+                        cellText.Text = "✕";
+                        cellText.Foreground = Brushes.White;
+                        break;
+                    case CellState.Miss:
+                        cellBorder.Background = new SolidColorBrush(GameSettings.MissColor);
+                        cellText.Text = "•";
+                        cellText.Foreground = Brushes.Black;
+                        break;
+                    case CellState.Destroyed:
+                        cellBorder.Background = new SolidColorBrush(GameSettings.DestroyedColor);
+                        cellText.Text = "✕";
+                        cellText.Foreground = Brushes.White;
+                        break;
+                }
             }
         }
     }

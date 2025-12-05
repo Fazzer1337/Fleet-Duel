@@ -13,7 +13,6 @@ namespace Fleet_Duel.GameLogic
         private GameBoard targetBoard;
         private List<Point> availableShots;
 
-        // Состояние для продвинутой логики
         private Point? firstHit;
         private Point? lastHit;
         private Point? currentDirection;
@@ -21,6 +20,7 @@ namespace Fleet_Duel.GameLogic
         private bool isSearchingDirection;
         private bool directionFound;
         private int hitsInDirection;
+        private int cheatCounter;
 
         public HardAIPlayer(GameBoard targetBoard)
         {
@@ -38,6 +38,7 @@ namespace Fleet_Duel.GameLogic
                     availableShots.Add(new Point(x, y));
 
             ResetHuntingState();
+            cheatCounter = 0;
         }
 
         private void ResetHuntingState()
@@ -56,10 +57,20 @@ namespace Fleet_Duel.GameLogic
             if (availableShots.Count == 0)
                 return new Point(-1, -1);
 
-            // Если есть первое попадание и мы ищем направление
+            cheatCounter++;
+            if (cheatCounter >= 5)
+            {
+                cheatCounter = 0;
+                Point cheatShot = FindHiddenShipCell();
+                if (cheatShot.X >= 0 && cheatShot.Y >= 0 && availableShots.Contains(cheatShot))
+                {
+                    availableShots.Remove(cheatShot);
+                    return cheatShot;
+                }
+            }
+
             if (firstHit.HasValue && isSearchingDirection && !directionFound)
             {
-                // Пробуем направления, которые еще не пробовали
                 Point tryShot = TryNextDirection();
                 if (tryShot.X >= 0 && tryShot.Y >= 0)
                 {
@@ -67,7 +78,6 @@ namespace Fleet_Duel.GameLogic
                 }
             }
 
-            // Если направление найдено, продолжаем в том же направлении
             if (directionFound && currentDirection.HasValue && lastHit.HasValue)
             {
                 Point nextShot = new Point(
@@ -82,22 +92,22 @@ namespace Fleet_Duel.GameLogic
                 }
                 else
                 {
-                    // Если нельзя стрелять в текущем направлении, пробуем противоположное
-                    return TryOppositeDirection();
+                    Point opposite = TryOppositeDirection();
+                    if (opposite.X >= 0 && opposite.Y >= 0)
+                        return opposite;
                 }
             }
 
-            // Иначе - умный случайный выстрел с приоритетом по клеткам с максимальной вероятностью
             return MakeSmartRandomShot();
         }
 
         private Point TryNextDirection()
         {
             Point[] directions = {
-                new Point(1, 0),   // вправо
-                new Point(-1, 0),  // влево
-                new Point(0, 1),   // вниз
-                new Point(0, -1)   // вверх
+                new Point(1, 0),
+                new Point(-1, 0),
+                new Point(0, 1),
+                new Point(0, -1)
             };
 
             foreach (var dir in directions)
@@ -136,14 +146,9 @@ namespace Fleet_Duel.GameLogic
                 -currentDirection.Value.Y
             );
 
-            // Проверяем, не пробовали ли уже это направление
             if (triedDirections.Contains(oppositeDir))
-            {
-                // Уже пробовали, значит корабль уничтожен или ошибка
                 return new Point(-1, -1);
-            }
 
-            // Начинаем с первой точки попадания в противоположном направлении
             Point oppositeShot = new Point(
                 firstHit.Value.X + oppositeDir.X,
                 firstHit.Value.Y + oppositeDir.Y
@@ -173,19 +178,21 @@ namespace Fleet_Duel.GameLogic
 
         private Point MakeSmartRandomShot()
         {
-            // Создаем карту вероятностей
             int[,] probabilityMap = new int[GameBoard.BoardSize, GameBoard.BoardSize];
 
-            // Заполняем вероятности на основе известных попаданий и промахов
-            foreach (var availableShot in availableShots)
+            foreach (var shot in availableShots)
             {
-                int x = (int)availableShot.X;
-                int y = (int)availableShot.Y;
+                int x = (int)shot.X;
+                int y = (int)shot.Y;
 
-                // Повышаем вероятность для клеток, где могли бы быть корабли
-                probabilityMap[x, y] = random.Next(1, 10);
+                if (((x + y) % 2) == 0)
+                    probabilityMap[x, y] += 2;
 
-                // Проверяем соседние клетки на наличие попаданий
+                probabilityMap[x, y] += CountStretchLength(x, y, 1, 0);
+                probabilityMap[x, y] += CountStretchLength(x, y, -1, 0);
+                probabilityMap[x, y] += CountStretchLength(x, y, 0, 1);
+                probabilityMap[x, y] += CountStretchLength(x, y, 0, -1);
+
                 for (int dx = -1; dx <= 1; dx++)
                 {
                     for (int dy = -1; dy <= 1; dy++)
@@ -198,26 +205,24 @@ namespace Fleet_Duel.GameLogic
                             CellState state = targetBoard.GetCellState(nx, ny);
                             if (state == CellState.Hit)
                             {
-                                probabilityMap[x, y] += 50;
+                                probabilityMap[x, y] += 40;
                             }
                         }
                     }
                 }
             }
 
-            // Находим клетку с максимальной вероятностью
             Point bestShot = new Point(-1, -1);
             int maxProbability = -1;
 
-            for (int x = 0; x < GameBoard.BoardSize; x++)
+            foreach (var p in availableShots)
             {
-                for (int y = 0; y < GameBoard.BoardSize; y++)
+                int x = (int)p.X;
+                int y = (int)p.Y;
+                if (probabilityMap[x, y] > maxProbability)
                 {
-                    if (probabilityMap[x, y] > maxProbability && availableShots.Contains(new Point(x, y)))
-                    {
-                        maxProbability = probabilityMap[x, y];
-                        bestShot = new Point(x, y);
-                    }
+                    maxProbability = probabilityMap[x, y];
+                    bestShot = p;
                 }
             }
 
@@ -227,11 +232,35 @@ namespace Fleet_Duel.GameLogic
                 return bestShot;
             }
 
-            // Fallback: случайный выстрел
             int index = random.Next(availableShots.Count);
             Point randomShot = availableShots[index];
             availableShots.RemoveAt(index);
             return randomShot;
+        }
+
+        private int CountStretchLength(int x, int y, int dx, int dy)
+        {
+            int length = 0;
+            int cx = x + dx;
+            int cy = y + dy;
+
+            while (cx >= 0 && cx < GameBoard.BoardSize &&
+                   cy >= 0 && cy < GameBoard.BoardSize)
+            {
+                var state = targetBoard.GetCellState(cx, cy);
+                if (state == CellState.Empty || state == CellState.Ship)
+                {
+                    length++;
+                    cx += dx;
+                    cy += dy;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            return length;
         }
 
         private bool IsValidShot(Point point)
@@ -240,13 +269,29 @@ namespace Fleet_Duel.GameLogic
                    point.Y >= 0 && point.Y < GameBoard.BoardSize;
         }
 
+        private Point FindHiddenShipCell()
+        {
+            for (int x = 0; x < GameBoard.BoardSize; x++)
+            {
+                for (int y = 0; y < GameBoard.BoardSize; y++)
+                {
+                    if (targetBoard.GetCellState(x, y) == CellState.Ship)
+                    {
+                        Point p = new Point(x, y);
+                        if (availableShots.Contains(p))
+                            return p;
+                    }
+                }
+            }
+            return new Point(-1, -1);
+        }
+
         public void UpdateAfterShot(Point shot, CellState result)
         {
             if (result == CellState.Hit)
             {
                 if (!firstHit.HasValue)
                 {
-                    // Первое попадание по кораблю
                     firstHit = shot;
                     lastHit = shot;
                     isSearchingDirection = true;
@@ -255,7 +300,6 @@ namespace Fleet_Duel.GameLogic
                 }
                 else if (currentDirection.HasValue)
                 {
-                    // Попали в том же направлении
                     lastHit = shot;
                     hitsInDirection++;
                     directionFound = true;
@@ -265,23 +309,15 @@ namespace Fleet_Duel.GameLogic
             {
                 if (isSearchingDirection && !directionFound)
                 {
-                    // Промах при поиске направления - продолжаем искать
-                    // Ничего не делаем, следующий MakeMove попробует следующее направление
                 }
                 else if (directionFound && currentDirection.HasValue)
                 {
-                    // Промах после того как нашли направление
-                    // Пробуем противоположное направление
                     isSearchingDirection = true;
                     directionFound = false;
                 }
             }
             else if (result == CellState.Destroyed)
             {
-                // Корабль уничтожен
-                ResetHuntingState();
-
-                // Удаляем все клетки вокруг уничтоженного корабля
                 for (int dx = -1; dx <= 1; dx++)
                 {
                     for (int dy = -1; dy <= 1; dy++)
@@ -290,6 +326,8 @@ namespace Fleet_Duel.GameLogic
                         availableShots.Remove(p);
                     }
                 }
+
+                ResetHuntingState();
             }
         }
 

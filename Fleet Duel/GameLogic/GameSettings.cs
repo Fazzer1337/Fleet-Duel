@@ -2,14 +2,20 @@
 
 namespace Fleet_Duel.GameLogic
 {
+    public enum GameMode
+    {
+        VsAI,
+        Hotseat
+    }
+
     public class GameSettings
     {
         public DifficultyLevel Difficulty { get; set; } = DifficultyLevel.Medium;
         public bool DarkTheme { get; set; } = false;
         public bool ShowShipPlacementHints { get; set; } = true;
         public bool AutoCompleteDestroyedShips { get; set; } = true;
+        public GameMode Mode { get; set; } = GameMode.VsAI;
 
-        // Цвета для тем
         public static Color LightCellColor = Colors.AliceBlue;
         public static Color DarkCellColor = Color.FromRgb(40, 44, 52);
         public static Color LightShipColor = Colors.Gray;

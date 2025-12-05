@@ -44,20 +44,27 @@ namespace Fleet_Duel.GameLogic
 
             Point shot;
 
-            // Если есть попадания, переходим в режим охоты
             if (isHunting && hitCells.Count > 0)
             {
-                // Берем последнее попадание
                 Point lastHit = hitCells.Last();
-
-                // Добавляем соседние клетки как потенциальные цели
                 AddAdjacentTargets(lastHit);
 
-                // Если есть потенциальные цели, стреляем по ним
+                if (hitCells.Count >= 2)
+                {
+                    var a = hitCells[hitCells.Count - 2];
+                    var b = hitCells[hitCells.Count - 1];
+                    bool horizontal = a.Y == b.Y;
+
+                    potentialTargets = potentialTargets
+                        .OrderByDescending(p => horizontal ? (p.Y == a.Y ? 1 : 0) : (p.X == a.X ? 1 : 0))
+                        .ToList();
+                }
+
                 if (potentialTargets.Count > 0)
                 {
-                    shot = potentialTargets[0];
-                    potentialTargets.RemoveAt(0);
+                    int index = random.Next(potentialTargets.Count);
+                    shot = potentialTargets[index];
+                    potentialTargets.RemoveAt(index);
 
                     if (availableShots.Contains(shot))
                     {
@@ -67,22 +74,27 @@ namespace Fleet_Duel.GameLogic
                 }
             }
 
-            // Иначе случайный выстрел
-            int index = random.Next(availableShots.Count);
-            shot = availableShots[index];
-            availableShots.RemoveAt(index);
+            var searchCells = availableShots
+                .Where(p => (((int)p.X + (int)p.Y) % 2) == 0)
+                .ToList();
+
+            if (searchCells.Count == 0)
+                searchCells = availableShots.ToList();
+
+            int randIndex = random.Next(searchCells.Count);
+            shot = searchCells[randIndex];
+            availableShots.Remove(shot);
 
             return shot;
         }
 
         private void AddAdjacentTargets(Point center)
         {
-            // Добавляем 4 направления
             Point[] directions = {
-                new Point(1, 0),   // вправо
-                new Point(-1, 0),  // влево
-                new Point(0, 1),   // вниз
-                new Point(0, -1)   // вверх
+                new Point(1, 0),
+                new Point(-1, 0),
+                new Point(0, 1),
+                new Point(0, -1)
             };
 
             foreach (var dir in directions)
@@ -113,22 +125,20 @@ namespace Fleet_Duel.GameLogic
 
                 if (result == CellState.Destroyed)
                 {
-                    // При уничтожении корабля очищаем цели вокруг него
                     ClearTargetsAroundShip(shot);
                     hitCells.Clear();
                     isHunting = false;
+                    potentialTargets.Clear();
                 }
             }
             else if (result == CellState.Miss)
             {
-                // Удаляем промахнувшуюся цель из потенциальных
                 potentialTargets.Remove(shot);
             }
         }
 
         private void ClearTargetsAroundShip(Point shot)
         {
-            // Удаляем все клетки в радиусе 1 от выстрела
             for (int dx = -1; dx <= 1; dx++)
             {
                 for (int dy = -1; dy <= 1; dy++)
