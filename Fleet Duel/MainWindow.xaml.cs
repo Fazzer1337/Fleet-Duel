@@ -382,13 +382,6 @@ namespace Fleet_Duel
                     return;
                 }
 
-                if (!isAutoPlaced && playerBoard.HasAdjacentShips())
-                {
-                    MessageBox.Show("Корабли не должны касаться друг друга! Проверьте расстановку.",
-                                  "Ошибка расстановки", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
                 currentState = GameState.PlayerTurn;
             }
             else
